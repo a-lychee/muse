@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from rapidfuzz import process
+from rapidfuzz import process, fuzz
 
 # Set up file paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,10 +30,11 @@ def recommend_movies(title, num_recommendations=5):
     """
     # Fuzzy match the input to find the closest movie title in the dataset
     titles = movies_df['title'].tolist()
-    match, score, index = process.extractOne(title, list(enumerate(titles)), scorer=process.fuzz.WRatio)
+    match = process.extractOne(title, titles, scorer=fuzz.WRatio)
 
-    matched_title = match[1]
-    matched_index = match[0]
+    matched_title = match[0]
+    score = match[1]
+    matched_index = movies_df.index[movies_df['title'] == matched_title][0]
 
     print(f"\n🔎 Closest match found: '{matched_title}' (Score: {score})\n")
 
