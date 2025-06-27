@@ -25,14 +25,14 @@ def main():
             print(f"❗ Invalid input: {e}")
             continue
 
-        # Save the feedback
+        # Save the feedback to CSV (append, no header, no index)
         feedback = pd.DataFrame([{
             "title": rate_title,
             "rating": rating,
             "date": datetime.now().isoformat()
         }])
 
-        feedback.to_csv("data/ratings.csv", mode='a', header=False, index=False)
+        feedback.to_csv("data/ratings.csv", mode='a', header=False, index=False, encoding='utf-8')
         print(f"✅ Rating saved for '{rate_title}'.")
 
 if __name__ == "__main__":
