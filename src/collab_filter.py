@@ -1,6 +1,6 @@
 import pandas as pd
 from surprise import Dataset, Reader, SVD
-from surprise.model_selection import train_test_split
+from surprise import train_test_split
 from surprise import accuracy
 
 def train_collab_filter(ratings_file="data/ratings.csv"):
