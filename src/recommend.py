@@ -1,52 +1,29 @@
 import pandas as pd
-from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from rapidfuzz import process, fuzz
+from rapidfuzz import process
 
-# Set up file paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_PATH = BASE_DIR / 'data' / 'ml-latest-small' / 'movies.csv'
+def recommend_movies(input_title, top_n=5):
+    # Load movies.csv only when needed
+    movies = pd.read_csv("data/ml-latest-small/movies.csv")
 
-# Load the movie data
-movies_df = pd.read_csv(DATA_PATH)
-movies_df['genres'] = movies_df['genres'].replace("(no genres listed)", "")
+    # Basic TF-IDF setup
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(movies['title'])
 
-# Prepare the TF-IDF matrix of genres
-tfidf = TfidfVectorizer(token_pattern=r'[^|]+')
-tfidf_matrix = tfidf.fit_transform(movies_df['genres'])
-cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-def recommend_movies(title, num_recommendations=5):
-    """
-    Recommend movies based on genre similarity using fuzzy matching for input.
-    
-    Args:
-        title (str): Movie title input by user (can be approximate)
-        num_recommendations (int): Number of movies to recommend
-        
-    Returns:
-        pandas.DataFrame: Recommended movies with titles and genres
-    """
-    # Fuzzy match the input to find the closest movie title in the dataset
-    titles = movies_df['title'].tolist()
-    match = process.extractOne(title, titles, scorer=fuzz.WRatio)
+    # Use fuzzy matching to find closest match
+    match = process.extractOne(input_title, movies['title'])
+    if not match:
+        return pd.DataFrame({'title': []})
 
     matched_title = match[0]
-    score = match[1]
-    matched_index = movies_df.index[movies_df['title'] == matched_title][0]
+    matched_idx = movies[movies['title'] == matched_title].index[0]
 
-    print(f"\n🔎 Closest match found: '{matched_title}' (Score: {score})\n")
+    # Compute similarity scores
+    cosine_sim = cosine_similarity(tfidf_matrix[matched_idx], tfidf_matrix).flatten()
+    similar_indices = cosine_sim.argsort()[-(top_n + 1):][::-1]
 
-    # Get similarity scores for all movies with respect to the matched movie
-    sim_scores = list(enumerate(cosine_sim[matched_index]))
+    recommendations = movies.iloc[similar_indices]
+    recommendations = recommendations[recommendations['title'] != matched_title]  # remove self
 
-    # Sort by similarity score in descending order and exclude the movie itself
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = [s for s in sim_scores if s[0] != matched_index]
-
-    # Take the top 'num_recommendations' similar movies
-    sim_scores = sim_scores[:num_recommendations]
-    movie_indices = [i[0] for i in sim_scores]
-
-    return movies_df.iloc[movie_indices][['title', 'genres']]
+    return recommendations
