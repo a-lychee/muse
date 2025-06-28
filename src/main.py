@@ -27,7 +27,8 @@ def root():
 
 @app.get("/recommend/content", response_model=List[str])
 def recommend_by_content(title: str = Query(..., description="Movie title to base recommendations on")):
-    recs = recommend_movies(title)
+    from .recommend import hybrid_recommend_movies
+    recs = hybrid_recommend_movies(title)
     return recs['title'].tolist()
 
 @app.get("/suggest", response_model=List[str])
