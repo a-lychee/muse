@@ -8,11 +8,10 @@
         :root {
             --bg-color: #1a1a1a;
             --text-color: #ffffff;
-            --primary-color: #646cff;
-            --secondary-color: #535bf2;
+            --primary-color: #b39ddb;
+            --secondary-color: #9575cd;
             --card-bg: #242424;
         }
-
         body {
             margin: 0;
             padding: 2rem;
@@ -21,23 +20,23 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             line-height: 1.6;
         }
-
         .container {
             max-width: 800px;
             margin: 0 auto;
             text-align: center;
         }
-
         h1 {
             font-size: 2.5rem;
             margin-bottom: 2rem;
             background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
         .search-box {
             display: flex;
+            flex-direction: row;
+            align-items: center;
             gap: 1rem;
             justify-content: center;
             margin-bottom: 2rem;
@@ -57,63 +56,6 @@
             width: 100%;
             box-sizing: border-box;
         }
-
-        button {
-            padding: 0.8rem 1.5rem;
-            font-size: 1rem;
-            background-color: var(--primary-color);
-            color: var(--text-color);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: var(--secondary-color);
-        }
-
-        #results {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-        }
-
-        .movie-card {
-            background-color: var(--card-bg);
-            padding: 1rem;
-            border-radius: 8px;
-            text-align: left;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .loading {
-            display: none;
-            margin: 2rem 0;
-        }
-
-        .loading::after {
-            content: "Loading...";
-            animation: dots 1.5s steps(5, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: "Loading."; }
-            40% { content: "Loading.."; }
-            60% { content: "Loading..."; }
-            80%, 100% { content: "Loading...."; }
-        }
-
         .autocomplete-list {
             position: absolute;
             background: var(--card-bg);
@@ -136,6 +78,70 @@
             background: var(--primary-color);
             color: #fff;
         }
+        button {
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        #results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .movie-card {
+            background-color: var(--card-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.3s ease-out forwards;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 80px;
+            box-sizing: border-box;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .loading {
+            display: none;
+            margin: 2rem 0;
+        }
+        .loading::after {
+            content: "Loading...";
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: "Loading."; }
+            40% { content: "Loading.."; }
+            60% { content: "Loading..."; }
+            80%, 100% { content: "Loading...."; }
+        }
+        @media (max-width: 700px) {
+            #results {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 500px) {
+            #results {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -143,7 +149,7 @@
         <h1>muse</h1>
         <div class="search-box">
             <div class="input-wrapper">
-                <input type="text" id="movieTitle" placeholder="Enter a movie title..." autocomplete="off">
+                <input type="text" id="movieTitle" placeholder="Enter a movie title" autocomplete="off">
                 <div id="autocomplete" class="autocomplete-list" style="display:none;"></div>
             </div>
             <button onclick="getRecommendations()">Get Recommendations</button>
@@ -151,12 +157,10 @@
         <div id="loading" class="loading"></div>
         <div id="results"></div>
     </div>
-
     <script>
         let debounceTimeout;
         let activeSuggestion = -1;
         let suggestions = [];
-
         async function fetchSuggestions(query) {
             if (!query) {
                 showSuggestions([]);
@@ -170,7 +174,6 @@
                 showSuggestions([]);
             }
         }
-
         function showSuggestions(list) {
             const autocomplete = document.getElementById('autocomplete');
             suggestions = list;
@@ -183,19 +186,16 @@
             autocomplete.innerHTML = list.map((item, idx) => `<div class="autocomplete-item" data-idx="${idx}">${item}</div>`).join('');
             autocomplete.style.display = 'block';
         }
-
         document.getElementById('movieTitle').addEventListener('input', function(e) {
             clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(() => fetchSuggestions(e.target.value), 200);
         });
-
         document.getElementById('autocomplete').addEventListener('mousedown', function(e) {
             if (e.target.classList.contains('autocomplete-item')) {
                 document.getElementById('movieTitle').value = e.target.textContent;
                 showSuggestions([]);
             }
         });
-
         document.getElementById('movieTitle').addEventListener('keydown', function(e) {
             const autocomplete = document.getElementById('autocomplete');
             if (autocomplete.style.display === 'block') {
@@ -220,7 +220,6 @@
                 }
             }
         });
-
         function updateActiveSuggestion() {
             const items = document.querySelectorAll('.autocomplete-item');
             items.forEach((item, idx) => {
@@ -230,35 +229,28 @@
                 items[activeSuggestion].scrollIntoView({block: 'nearest'});
             }
         }
-
         document.addEventListener('click', function(e) {
             if (!document.querySelector('.search-box').contains(e.target)) {
                 showSuggestions([]);
             }
         });
-
         async function getRecommendations() {
             const movieTitle = document.getElementById('movieTitle').value;
             if (!movieTitle) return;
-
             const loading = document.getElementById('loading');
             const results = document.getElementById('results');
-            
             loading.style.display = 'block';
             results.innerHTML = '';
-
             try {
                 const response = await fetch(`/recommend/content?title=${encodeURIComponent(movieTitle)}`);
                 const movies = await response.json();
-
                 loading.style.display = 'none';
-                
                 if (movies.length === 0) {
                     results.innerHTML = '<p>No recommendations found.</p>';
                     return;
                 }
-
-                movies.forEach((movie, index) => {
+                // Show up to 6 recommendations
+                movies.slice(0, 6).forEach((movie, index) => {
                     const card = document.createElement('div');
                     card.className = 'movie-card';
                     card.style.animationDelay = `${index * 0.1}s`;
@@ -271,7 +263,6 @@
                 console.error('Error:', error);
             }
         }
-
         // Allow Enter key to trigger search
         document.getElementById('movieTitle').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {

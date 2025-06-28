@@ -2,8 +2,22 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from rapidfuzz import process
+import re
 
-def recommend_movies(input_title, top_n=5):
+def normalize_title(title):
+    # Move trailing ', The', ', An', ', A' to the front
+    match = re.match(r'^(.*?)(?:,\s(The|An|A))?(\s*\(\d{4}\))?$', title)
+    if match:
+        main, article, year = match.groups()
+        if article:
+            main = main.rstrip()
+            if year:
+                return f"{article} {main}{year}"
+            else:
+                return f"{article} {main}"
+    return title
+
+def recommend_movies(input_title, top_n=6):
     # Load movies.csv only when needed
     movies = pd.read_csv("data/ml-latest-small/movies.csv")
 
@@ -26,4 +40,7 @@ def recommend_movies(input_title, top_n=5):
     recommendations = movies.iloc[similar_indices]
     recommendations = recommendations[recommendations['title'] != matched_title]  # remove self
 
+    # Normalize titles for display
+    recommendations = recommendations.copy()
+    recommendations['title'] = recommendations['title'].apply(normalize_title)
     return recommendations
