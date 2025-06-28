@@ -1,18 +1,39 @@
 from fastapi import FastAPI, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from typing import List
 from .recommend import recommend_movies
-# from .generate_collab_recs import recommend_unseen_movies  # Disabled for now
+from .load_data import load_movies
 
 app = FastAPI()
 
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 def root():
-    return {"message": "Welcome to your AI Movie Recommender!"}
+    return FileResponse("static/index.html")
 
 @app.get("/recommend/content", response_model=List[str])
 def recommend_by_content(title: str = Query(..., description="Movie title to base recommendations on")):
     recs = recommend_movies(title)
     return recs['title'].tolist()
+
+@app.get("/suggest", response_model=List[str])
+def suggest_titles(q: str = Query(..., description="Partial movie title for suggestions")):
+    movies_df = load_movies()
+    suggestions = movies_df[movies_df['title'].str.contains(q, case=False, na=False)]['title'].head(10).tolist()
+    return suggestions
 
 # Collaborative filtering temporarily disabled due to memory limits on Render's free tier
 # @app.get("/recommend/collab", response_model=List[str])
