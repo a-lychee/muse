@@ -31,7 +31,7 @@ def load_tmdb_data():
 
 @app.get("/recommend/content", response_model=List[Dict[str, Any]])
 def recommend_by_content(title: str = Query(..., description="Movie title to base recommendations on")):
-    from .recommend import hybrid_recommend_movies
+    from .recommend_enhanced import hybrid_recommend_movies
     recs = hybrid_recommend_movies(title)
     # Convert DataFrame to list of dicts for response
     return recs.to_dict(orient="records")
