@@ -1,78 +1,99 @@
 import pandas as pd
+import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from rapidfuzz import process
 import re
-from surprise import SVD, Dataset, Reader
 
 def normalize_title(title):
-    # Move trailing ', The', ', An', ', A' to the front
-    match = re.match(r'^(.*?)(?:,\s(The|An|A))?(\s*\(\d{4}\))?$', title)
-    if match:
-        main, article, year = match.groups()
-        if article:
-            main = main.rstrip()
-            if year:
-                return f"{article} {main}{year}"
-            else:
-                return f"{article} {main}"
+    # No need to handle articless like with MovieLens, TMDb titles are already normalized
     return title
 
+def load_tmdb_data():
+    """Load movie data from TMDb JSON file"""
+    with open("data/tmdb_movies.json", "r", encoding="utf-8") as f:
+        movies = json.load(f)
+    return pd.DataFrame(movies)
+
 def recommend_movies(input_title, top_n=6):
-    # Load movies.csv only when needed
-    movies = pd.read_csv("data/ml-latest-small/movies.csv")
-
-    # Basic TF-IDF setup
+    """Content-based recommendation using movie metadata"""
+    # Load TMDb movies
+    movies_df = load_tmdb_data()
+    
+    # Create a rich feature set combining overview, genres, actors, directors
+    movies_df["features"] = (
+        movies_df["overview"].fillna("") + " " + 
+        movies_df["genres"].apply(lambda g: " ".join(g)) + " " +
+        movies_df["actors"].apply(lambda a: " ".join(a)) + " " +
+        movies_df["directors"].apply(lambda d: " ".join(d))
+    )
+    
+    # Basic TF-IDF setup on combined features (not just title)
     tfidf = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(movies['title'])
-
-    # Use fuzzy matching to find closest match
-    match = process.extractOne(input_title, movies['title'])
+    tfidf_matrix = tfidf.fit_transform(movies_df['features'])
+    
+    # Use fuzzy matching to find closest title match
+    movie_titles = movies_df['title'].tolist()
+    match = process.extractOne(input_title, movie_titles)
     if not match:
-        return pd.DataFrame({'title': []})
-
+        return pd.DataFrame({'title': [], 'overview': []})
+    
     matched_title = match[0]
-    matched_idx = movies[movies['title'] == matched_title].index[0]
-
+    matched_idx = movies_df[movies_df['title'] == matched_title].index[0]
+    
     # Compute similarity scores
     cosine_sim = cosine_similarity(tfidf_matrix[matched_idx], tfidf_matrix).flatten()
     similar_indices = cosine_sim.argsort()[-(top_n + 1):][::-1]
-
-    recommendations = movies.iloc[similar_indices]
+    
+    # Get recommendations
+    recommendations = movies_df.iloc[similar_indices]
     recommendations = recommendations[recommendations['title'] != matched_title]  # remove self
-
-    # Normalize titles for display
-    recommendations = recommendations.copy()
-    recommendations['title'] = recommendations['title'].apply(normalize_title)
-    return recommendations
+    
+    # Select columns to return, including poster_url and vote_average
+    return recommendations[['title', 'overview', 'genres', 'actors', 'directors', 'poster_url', 'vote_average']][:top_n]
 
 def hybrid_recommend_movies(input_title, top_n=6):
-    # Content-based recommendations
-    movies = pd.read_csv("data/ml-latest-small/movies.csv")
+    """
+    Hybrid recommendation combining content-based filtering
+    This is a simplified version as we no longer have user ratings
+    We weight different features instead of using collaborative filtering
+    """
+    movies_df = load_tmdb_data()
+    
+    # Weight different features differently
+    movies_df["weighted_features"] = (
+        # Give plot/overview higher weight (x3)
+        movies_df["overview"].fillna("") + " " + 
+        movies_df["overview"].fillna("") + " " + 
+        movies_df["overview"].fillna("") + " " + 
+        # Give genre good weight (x2)
+        movies_df["genres"].apply(lambda g: " ".join(g)) + " " +
+        movies_df["genres"].apply(lambda g: " ".join(g)) + " " +
+        # Actors and directors get normal weight
+        movies_df["actors"].apply(lambda a: " ".join(a)) + " " +
+        movies_df["directors"].apply(lambda d: " ".join(d))
+    )
+    
+    # TF-IDF on weighted features
     tfidf = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(movies['title'])
-    match = process.extractOne(input_title, movies['title'])
+    tfidf_matrix = tfidf.fit_transform(movies_df['weighted_features'])
+    
+    # Use fuzzy matching to find closest title match
+    movie_titles = movies_df['title'].tolist()
+    match = process.extractOne(input_title, movie_titles)
     if not match:
-        return pd.DataFrame({'title': []})
+        return pd.DataFrame({'title': [], 'overview': []})
+    
     matched_title = match[0]
-    matched_idx = movies[movies['title'] == matched_title].index[0]
+    matched_idx = movies_df[movies_df['title'] == matched_title].index[0]
+    
+    # Compute similarity scores
     cosine_sim = cosine_similarity(tfidf_matrix[matched_idx], tfidf_matrix).flatten()
-    similar_indices = cosine_sim.argsort()[-(top_n*3 + 1):][::-1]  # get more for hybrid
-    content_recs = movies.iloc[similar_indices]
-    content_recs = content_recs[content_recs['title'] != matched_title]
-    # Collaborative filtering scores
-    ratings_df = pd.read_csv("data/ratings.csv")
-    ratings_df['user_id'] = 1
-    reader = Reader(rating_scale=(1, 5))
-    data = Dataset.load_from_df(ratings_df[['user_id', 'title', 'rating']], reader)
-    trainset = data.build_full_trainset()
-    model = SVD()
-    model.fit(trainset)
-    # Predict for content-based recs only
-    predictions = []
-    for title in content_recs['title']:
-        pred = model.predict(uid=1, iid=title)
-        predictions.append((title, pred.est))
-    top_recs = sorted(predictions, key=lambda x: x[1], reverse=True)[:top_n]
-    result_titles = [normalize_title(title) for title, _ in top_recs]
-    return pd.DataFrame({'title': result_titles})
+    similar_indices = cosine_sim.argsort()[-(top_n + 1):][::-1]
+    
+    # Get recommendations
+    recommendations = movies_df.iloc[similar_indices]
+    recommendations = recommendations[recommendations['title'] != matched_title]  # remove self
+    
+    # Select columns to return, including poster_url and vote_average
+    return recommendations[['title', 'overview', 'genres', 'actors', 'directors', 'poster_url', 'vote_average']][:top_n]
